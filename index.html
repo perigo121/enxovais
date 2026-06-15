@@ -334,6 +334,79 @@
 const MASTER_API_KEY = "$2a$10$3GUmFfM8hUEN0hJ5F0MvdOfoTTx3dQQ87efvtzKWprUQ.qaxmjLwu";
 const WHATSAPP_ICON_PNG = "https://cdn-icons-png.flaticon.com/512/1384/1384023.png";
 
+// ==========================================
+// INTEGRAÇÃO COM JSONBIN.IO (NUVEM)
+// ==========================================
+const BIN_ID = "6a302e24f5f4af5e29f65505";
+const API_KEY = "$2a$10$fo3YQ/u..L0O40LB/WvvueXcPr2Zzad6u0j9ipzsU3v45DFFggjpG";
+
+async function salvarTudoNoJsonBin() {
+    try {
+        const dadosCompletos = {
+            store: state.store,
+            categories: state.categories,
+            products: state.products,
+            ultima_atualizacao: new Date().toISOString()
+        };
+        
+        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify(dadosCompletos)
+        });
+        console.log("✅ Dados salvos na nuvem (JSONBin.io)");
+    } catch(e) {
+        console.error("❌ Erro ao salvar na nuvem:", e);
+    }
+}
+
+async function carregarDoJsonBin() {
+    try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        const dados = await res.json();
+        
+        if (dados.record && dados.record.store) {
+            state.store = dados.record.store;
+            state.categories = dados.record.categories;
+            state.products = dados.record.products;
+            
+            // Salva no localStorage também (backup local)
+            DB.save('tz_store', state.store);
+            DB.save('tz_categories', state.categories);
+            DB.save('tz_products', state.products);
+            
+            console.log("✅ Dados carregados da nuvem!");
+            return true;
+        }
+        return false;
+    } catch(e) {
+        console.log("Nenhum dado na nuvem ainda, usando local");
+        return false;
+    }
+}
+
+async function sincronizarComNuvem() {
+    showToast("Enviando dados para a nuvem...", "success");
+    await salvarTudoNoJsonBin();
+    showToast("✅ Loja salva na nuvem com sucesso!", "success");
+}
+
+async function baixarDaNuvem() {
+    showToast("Carregando dados da nuvem...", "success");
+    const ok = await carregarDoJsonBin();
+    if (ok) {
+        showToast("✅ Dados carregados da nuvem!", "success");
+        render();
+    } else {
+        showToast("⚠️ Nenhum dado encontrado na nuvem", "error");
+    }
+}
+
 // Variável para controle de toques no cadeado
 let lockClickCount = 0;
 let lockClickTimer = null;
@@ -358,7 +431,7 @@ const ICONS = {
   cal:'<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
   userPlus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
-  minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="5" y1="12" x2="20" y2="12"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
   arrowL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
   close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
@@ -467,9 +540,9 @@ const state = {
   appFloatShown: DB.load('appFloatShown', 0)
 };
 
-function saveStore(){DB.save('tz_store', state.store)}
-function saveCategories(){DB.save('tz_categories', state.categories)}
-function saveProducts(){DB.save('tz_products', state.products)}
+function saveStore(){DB.save('tz_store', state.store); salvarTudoNoJsonBin();}
+function saveCategories(){DB.save('tz_categories', state.categories); salvarTudoNoJsonBin();}
+function saveProducts(){DB.save('tz_products', state.products); salvarTudoNoJsonBin();}
 function saveCart(){DB.save('tz_cart', state.cart)}
 function saveAppFloatShown(){DB.save('appFloatShown', state.appFloatShown)}
 
@@ -477,22 +550,14 @@ const fmt = v => 'R$ ' + Number(v||0).toFixed(2).replace('.', ',');
 const cartTotal = () => state.cart.reduce((s,p)=>s+p.qty*p.price,0);
 const cartCount = () => state.cart.reduce((s,p)=>s+p.qty,0);
 
-// Função para abrir admin com 3 toques no cadeado (ícone de cadeado original)
 function onLockClick(e) {
   e.stopPropagation();
   e.preventDefault();
   lockClickCount++;
-  console.log('Clique no cadeado:', lockClickCount);
-  
   if (lockClickTimer) clearTimeout(lockClickTimer);
-  lockClickTimer = setTimeout(() => { 
-    lockClickCount = 0; 
-    console.log('Contador resetado');
-  }, 800);
-  
+  lockClickTimer = setTimeout(() => { lockClickCount = 0; }, 800);
   if (lockClickCount >= 3) {
     lockClickCount = 0;
-    console.log('Abrindo admin...');
     navigate('admin');
     showToast('🔓 Modo Administrador aberto!', 'success');
   }
@@ -936,7 +1001,7 @@ function adminLogout(){ sessionStorage.removeItem('tz_admin'); state.adminAuth =
 
 function tplAdmin(){
   if(!state.adminAuth) return tplLogin();
-  return `<div class="admin-wrap"><div class="admin-header"><div class="container"><h1>${ICONS.gear} Painel Administrativo — ${state.store.name}</h1><div class="admin-actions"><button class="a-btn outline" onclick="exportData()">${ICONS.download} Exportar Backup</button><button class="a-btn outline" onclick="document.getElementById('importFile').click()">${ICONS.upload} Importar Backup</button><input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" /><button class="a-btn ghost" onclick="resetAll()">Restaurar Padrão</button><a href="#" class="a-btn primary" onclick="event.preventDefault();navigate('home')">Ver Loja</a><button class="a-btn red" onclick="adminLogout()">${ICONS.exit} Sair</button></div></div></div><div class="admin-tabs"><div class="container"><button class="${state.adminTab==='store'?'active':''}" onclick="state.adminTab='store';render()">Loja & Aparência</button><button class="${state.adminTab==='categories'?'active':''}" onclick="state.adminTab='categories';render()">Categorias (${state.categories.length})</button><button class="${state.adminTab==='products'?'active':''}" onclick="state.adminTab='products';render()">Produtos (${state.products.length})</button></div></div><div class="container admin-section">${state.adminTab==='store'?tplAdminStore():''}${state.adminTab==='categories'?tplAdminCategories():''}${state.adminTab==='products'?tplAdminProducts():''}</div></div>`;
+  return `<div class="admin-wrap"><div class="admin-header"><div class="container"><h1>${ICONS.gear} Painel Administrativo — ${state.store.name}</h1><div class="admin-actions"><button class="a-btn green" onclick="sincronizarComNuvem()">☁️ Sincronizar com Nuvem</button><button class="a-btn outline" onclick="baixarDaNuvem()">⬇️ Baixar da Nuvem</button><button class="a-btn outline" onclick="exportData()">${ICONS.download} Exportar Backup</button><button class="a-btn outline" onclick="document.getElementById('importFile').click()">${ICONS.upload} Importar Backup</button><input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" /><button class="a-btn ghost" onclick="resetAll()">Restaurar Padrão</button><a href="#" class="a-btn primary" onclick="event.preventDefault();navigate('home')">Ver Loja</a><button class="a-btn red" onclick="adminLogout()">${ICONS.exit} Sair</button></div></div></div><div class="admin-tabs"><div class="container"><button class="${state.adminTab==='store'?'active':''}" onclick="state.adminTab='store';render()">Loja & Aparência</button><button class="${state.adminTab==='categories'?'active':''}" onclick="state.adminTab='categories';render()">Categorias (${state.categories.length})</button><button class="${state.adminTab==='products'?'active':''}" onclick="state.adminTab='products';render()">Produtos (${state.products.length})</button></div></div><div class="container admin-section">${state.adminTab==='store'?tplAdminStore():''}${state.adminTab==='categories'?tplAdminCategories():''}${state.adminTab==='products'?tplAdminProducts():''}</div></div>`;
 }
 
 function tplAdminStore(){
@@ -946,7 +1011,7 @@ function tplAdminStore(){
 function saveStoreForm(form){
   const fd = new FormData(form);
   for(const [k,v] of fd.entries()) state.store[k] = (k==='orders'||k==='productsCount')?Number(v):v;
-  saveStore(); showToast('Loja atualizada!','success'); render();
+  saveStore(); showToast('Loja atualizada e salva na nuvem!','success'); render();
 }
 function uploadStoreImg(e, key){
   const file = e.target.files[0]; if(!file) return;
@@ -1068,7 +1133,7 @@ function importData(e){
       if(data.categories) state.categories = data.categories;
       if(data.products) state.products = data.products;
       saveStore(); saveCategories(); saveProducts();
-      showToast('Backup importado!','success'); render();
+      showToast('Backup importado e salvo na nuvem!','success'); render();
     }catch(err){ showToast('Arquivo inválido','error'); }
   };
   reader.readAsText(file);
@@ -1079,10 +1144,16 @@ function resetAll(){
   state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   state.products = JSON.parse(JSON.stringify(DEFAULT_PRODUCTS));
   saveStore(); saveCategories(); saveProducts();
-  showToast('Restaurado para o padrão','success'); render();
+  showToast('Restaurado para o padrão e salvo na nuvem','success'); render();
 }
 
-function render(){
+async function render(){
+  // Tenta carregar da nuvem antes de renderizar (só uma vez)
+  if (!window._nuvemCarregada) {
+    window._nuvemCarregada = true;
+    await carregarDoJsonBin();
+  }
+  
   document.documentElement.style.setProperty('--accent', state.store.accent || '#000000');
   const app = document.getElementById('app');
   if(state.page==='admin' || location.hash==='#admin'){
@@ -1108,155 +1179,6 @@ setTimeout(()=>{
   startNotifs();
   showAppFloat();
 }, 30);
-</script><script>
-// ... todo o código antigo que já existia ...
-
-if(location.hash==='#admin') state.page='admin';
-
-setTimeout(()=>{
-  render();
-  startNotifs();
-  showAppFloat();
-}, 30);
-
-// ==========================================
-// CÓDIGO DA NUVEM - COLE AQUI (DENTRO DO SCRIPT!)
-// ==========================================
-const BIN_ID = "6a302e24f5f4af5e29f65505";
-const API_KEY = "$2a$10$fo3YQ/u..L0O40LB/WvvueXcPr2Zzad6u0j9ipzsU3v45DFFggjpG";
-
-async function carregarTudo() {
-    try {
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { 'X-Master-Key': API_KEY }
-        });
-        const dados = await res.json();
-        return dados.record;
-    } catch(e) {
-        console.log("Erro ao carregar", e);
-        return null;
-    }
-}
-
-async function salvarTudo(dados) {
-    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Master-Key': API_KEY
-        },
-        body: JSON.stringify(dados)
-    });
-}
-
-(async function() {
-    const dados = await carregarTudo();
-    if (!dados) return;
-    
-    if (dados.cores) {
-        document.body.style.backgroundColor = dados.cores.fundo;
-        document.body.style.color = dados.cores.texto;
-        document.querySelectorAll('button, .btn').forEach(btn => {
-            btn.style.backgroundColor = dados.cores.primaria;
-        });
-    }
-    
-    if (dados.banner && document.getElementById('banner')) {
-        document.getElementById('banner').src = dados.banner;
-    }
-    
-    if (dados.texto && document.getElementById('texto-principal')) {
-        document.getElementById('texto-principal').innerText = dados.texto;
-    }
-    
-    if (dados.produtos && document.getElementById('produtos')) {
-        document.getElementById('produtos').innerHTML = dados.produtos.map(p => `
-            <div style="border:1px solid #ddd; padding:10px; margin:10px">
-                <img src="${p.imagem}" width="100">
-                <h3>${p.nome}</h3>
-                <p>R$ ${p.preco}</p>
-            </div>
-        `).join('');
-    }
-})();
-
-if (window.location.search.includes('admin') || location.hash === '#admin') {
-    const originalContent = document.body.innerHTML;
-    
-    document.body.innerHTML = `
-        <div style="max-width:600px; margin:50px auto; padding:20px; background:#f5f5f5; border-radius:10px; font-family:Arial">
-            <h1>⚙️ Admin - Salvar na Nuvem</h1>
-            
-            <label>Cor Primária (botões):</label>
-            <input type="color" id="corPrimaria" style="width:100%"><br><br>
-            
-            <label>Cor de Fundo:</label>
-            <input type="color" id="corFundo" style="width:100%"><br><br>
-            
-            <label>Cor do Texto:</label>
-            <input type="color" id="corTexto" style="width:100%"><br><br>
-            
-            <label>URL do Banner:</label>
-            <input type="text" id="bannerUrl" style="width:100%" placeholder="https://..."><br><br>
-            
-            <label>Texto Principal:</label>
-            <textarea id="textoPrincipal" style="width:100%" rows="3"></textarea><br><br>
-            
-            <label>Produtos (formato: nome|preco|imagem) - um por linha:</label>
-            <textarea id="listaProdutos" style="width:100%" rows="5" placeholder="Lençol Casal|89.90|https://..."></textarea><br><br>
-            
-            <button onclick="salvarConfig()" style="background:#ff69b4; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer">💾 SALVAR NA NUVEM</button>
-            <button onclick="voltarSite()" style="background:#666; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer">◀️ Voltar ao site</button>
-            <div id="msg" style="margin-top:10px; color:green"></div>
-        </div>
-    `;
-    
-    (async function() {
-        const atual = await carregarTudo();
-        if(atual) {
-            document.getElementById('corPrimaria').value = atual.cores?.primaria || '#ff69b4';
-            document.getElementById('corFundo').value = atual.cores?.fundo || '#ffffff';
-            document.getElementById('corTexto').value = atual.cores?.texto || '#000000';
-            document.getElementById('bannerUrl').value = atual.banner || '';
-            document.getElementById('textoPrincipal').value = atual.texto || '';
-            if(atual.produtos) {
-                document.getElementById('listaProdutos').value = atual.produtos.map(p => `${p.nome}|${p.preco}|${p.imagem}`).join('\n');
-            }
-        }
-    })();
-    
-    window.salvarConfig = async function() {
-        const linhas = document.getElementById('listaProdutos').value.split('\n');
-        const produtos = [];
-        for(let linha of linhas) {
-            const [nome, preco, imagem] = linha.split('|');
-            if(nome && preco) {
-                produtos.push({ nome, preco: parseFloat(preco), imagem: imagem || 'https://via.placeholder.com/100' });
-            }
-        }
-        
-        const dadosParaSalvar = {
-            cores: {
-                primaria: document.getElementById('corPrimaria').value,
-                fundo: document.getElementById('corFundo').value,
-                texto: document.getElementById('corTexto').value
-            },
-            banner: document.getElementById('bannerUrl').value,
-            texto: document.getElementById('textoPrincipal').value,
-            produtos: produtos
-        };
-        
-        await salvarTudo(dadosParaSalvar);
-        document.getElementById('msg').innerHTML = '✅ Salvo na nuvem com sucesso!';
-        setTimeout(() => { window.location.href = window.location.pathname; }, 1500);
-    };
-    
-    window.voltarSite = function() {
-        window.location.href = window.location.pathname;
-    };
-}
-
 </script>
 </body>
 </html>
-
