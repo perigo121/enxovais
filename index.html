@@ -1108,6 +1108,156 @@ setTimeout(()=>{
   startNotifs();
   showAppFloat();
 }, 30);
+</script><script>
+// ... todo o código antigo que já existia ...
+
+if(location.hash==='#admin') state.page='admin';
+
+setTimeout(()=>{
+  render();
+  startNotifs();
+  showAppFloat();
+}, 30);
+
+// ==========================================
+// CÓDIGO DA NUVEM - COLE AQUI (DENTRO DO SCRIPT!)
+// ==========================================
+const BIN_ID = "6a302e24f5f4af5e29f65505";
+const API_KEY = "$2a$10$fo3YQ/u..L0O40LB/WvvueXcPr2Zzad6u0j9ipzsU3v45DFFggjpG";
+
+async function carregarTudo() {
+    try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+            headers: { 'X-Master-Key': API_KEY }
+        });
+        const dados = await res.json();
+        return dados.record;
+    } catch(e) {
+        console.log("Erro ao carregar", e);
+        return null;
+    }
+}
+
+async function salvarTudo(dados) {
+    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': API_KEY
+        },
+        body: JSON.stringify(dados)
+    });
+}
+
+(async function() {
+    const dados = await carregarTudo();
+    if (!dados) return;
+    
+    if (dados.cores) {
+        document.body.style.backgroundColor = dados.cores.fundo;
+        document.body.style.color = dados.cores.texto;
+        document.querySelectorAll('button, .btn').forEach(btn => {
+            btn.style.backgroundColor = dados.cores.primaria;
+        });
+    }
+    
+    if (dados.banner && document.getElementById('banner')) {
+        document.getElementById('banner').src = dados.banner;
+    }
+    
+    if (dados.texto && document.getElementById('texto-principal')) {
+        document.getElementById('texto-principal').innerText = dados.texto;
+    }
+    
+    if (dados.produtos && document.getElementById('produtos')) {
+        document.getElementById('produtos').innerHTML = dados.produtos.map(p => `
+            <div style="border:1px solid #ddd; padding:10px; margin:10px">
+                <img src="${p.imagem}" width="100">
+                <h3>${p.nome}</h3>
+                <p>R$ ${p.preco}</p>
+            </div>
+        `).join('');
+    }
+})();
+
+if (window.location.search.includes('admin') || location.hash === '#admin') {
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = `
+        <div style="max-width:600px; margin:50px auto; padding:20px; background:#f5f5f5; border-radius:10px; font-family:Arial">
+            <h1>⚙️ Admin - Salvar na Nuvem</h1>
+            
+            <label>Cor Primária (botões):</label>
+            <input type="color" id="corPrimaria" style="width:100%"><br><br>
+            
+            <label>Cor de Fundo:</label>
+            <input type="color" id="corFundo" style="width:100%"><br><br>
+            
+            <label>Cor do Texto:</label>
+            <input type="color" id="corTexto" style="width:100%"><br><br>
+            
+            <label>URL do Banner:</label>
+            <input type="text" id="bannerUrl" style="width:100%" placeholder="https://..."><br><br>
+            
+            <label>Texto Principal:</label>
+            <textarea id="textoPrincipal" style="width:100%" rows="3"></textarea><br><br>
+            
+            <label>Produtos (formato: nome|preco|imagem) - um por linha:</label>
+            <textarea id="listaProdutos" style="width:100%" rows="5" placeholder="Lençol Casal|89.90|https://..."></textarea><br><br>
+            
+            <button onclick="salvarConfig()" style="background:#ff69b4; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer">💾 SALVAR NA NUVEM</button>
+            <button onclick="voltarSite()" style="background:#666; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer">◀️ Voltar ao site</button>
+            <div id="msg" style="margin-top:10px; color:green"></div>
+        </div>
+    `;
+    
+    (async function() {
+        const atual = await carregarTudo();
+        if(atual) {
+            document.getElementById('corPrimaria').value = atual.cores?.primaria || '#ff69b4';
+            document.getElementById('corFundo').value = atual.cores?.fundo || '#ffffff';
+            document.getElementById('corTexto').value = atual.cores?.texto || '#000000';
+            document.getElementById('bannerUrl').value = atual.banner || '';
+            document.getElementById('textoPrincipal').value = atual.texto || '';
+            if(atual.produtos) {
+                document.getElementById('listaProdutos').value = atual.produtos.map(p => `${p.nome}|${p.preco}|${p.imagem}`).join('\n');
+            }
+        }
+    })();
+    
+    window.salvarConfig = async function() {
+        const linhas = document.getElementById('listaProdutos').value.split('\n');
+        const produtos = [];
+        for(let linha of linhas) {
+            const [nome, preco, imagem] = linha.split('|');
+            if(nome && preco) {
+                produtos.push({ nome, preco: parseFloat(preco), imagem: imagem || 'https://via.placeholder.com/100' });
+            }
+        }
+        
+        const dadosParaSalvar = {
+            cores: {
+                primaria: document.getElementById('corPrimaria').value,
+                fundo: document.getElementById('corFundo').value,
+                texto: document.getElementById('corTexto').value
+            },
+            banner: document.getElementById('bannerUrl').value,
+            texto: document.getElementById('textoPrincipal').value,
+            produtos: produtos
+        };
+        
+        await salvarTudo(dadosParaSalvar);
+        document.getElementById('msg').innerHTML = '✅ Salvo na nuvem com sucesso!';
+        setTimeout(() => { window.location.href = window.location.pathname; }, 1500);
+    };
+    
+    window.voltarSite = function() {
+        window.location.href = window.location.pathname;
+    };
+}
+
 </script>
+</body>
+</html>
 </body>
 </html>
